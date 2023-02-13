@@ -71,11 +71,13 @@ MEANS = {
 }
 numerical_columns = []
 
+# numeric_column 用于创建一个数值特征列
 for feature in MEANS.keys():
   num_col = tf.feature_column.numeric_column(feature, normalizer_fn=functools.partial(process_continuous_data, MEANS[feature]))
   numerical_columns.append(num_col)
 
 # 创建预处理
+# keras.layers.DenseFeatures：将任意数量的稠密特征列作为输入，并将它们组合为一个输出数组。
 preprocessing_layer = tf.keras.layers.DenseFeatures(categorical_columns+numerical_columns)
 
 # 构建模型
@@ -86,6 +88,8 @@ model = tf.keras.Sequential([
   tf.keras.layers.Dense(1, activation='sigmoid'),
 ])
 
+# binary_crossentropy 通常用于二分类问题。
+# 选择 Adam 优化算法
 model.compile(
     loss='binary_crossentropy',
     optimizer='adam',
