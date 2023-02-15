@@ -6,6 +6,7 @@ import soundfile as sf
 
 from keras.layers import Conv1D, Dense, LSTM, Input
 from keras.models import Model
+from keras.callbacks import ModelCheckpoint
 
 def snr_mixer(clean_file, noise_file, sample_rate=16000):
     clean_audio, _ = librosa.load(clean_file, sr=sample_rate)
@@ -81,7 +82,16 @@ def load_audio_file(filename):
     audio, sample_rate = sf.read(filename)
     return audio, sample_rate
 
+def self_define_loss():
+    def loss(y_true, y_pred):
+        return tf.keras.losses.mean_squared_error(y_true, y_pred)
+    return loss
 
+
+# 一般来说，block_len 越大(1024 或者2048)，对于噪音信号的处理能力就越强，但是计算代价也会相应增加。
+block_len = 2048  #代表了分块长度
+clean_files=[""]
+noise_files=[""]
 
 dataset = tf.data.Dataset.from_generator(
     data_generator2(clean_files, noise_files, block_len),                     
@@ -95,9 +105,18 @@ dataset_val = tf.data.Dataset.from_generator(
     args=None
 )
 
-
-
+# 帧长（win_len）和帧移（win_shift）
+win_len = 1024
+win_shift= 512
 noisy_audio = Input(batch_shape=(None, None), name='input_1')
+
+# such as 16 or 32
+num_filters = 16
+filter_len = 128 #64/128
+num_units = 32
+learning_rate = 0.0005
+file_path =  './tf/audiowork'
+
 windows = tf.signal.frame(noisy_audio, win_len, win_shift)
 stft_res = tf.signal.rfft(windows)
 
@@ -109,36 +128,24 @@ forward_res = backward_res[:, ::-1, :]
 istft_res = tf.signal.irfft(forward_res)
 
 Output = tf.keras.layers.TimeDistributed(Dense(units=1), name='output')(istft_res)
-model = Model(inputs=noisy_audio, outputs=Output)
 
+model = Model(inputs=noisy_audio, outputs=Output)
+weights_file = './audiowork.h5'
+
+# Define a ModelCheckpoint callback to save the model's weights
+checkpoint_callback = ModelCheckpoint(weights_file, save_weights_only=True)
 # Define Loss Function and optimizer
 sgd = tf.keras.optimizers.SGD(lr=learning_rate, momentum=0.9)
 model.compile(loss=self_define_loss(), optimizer=sgd)
 model.fit(x=dataset,
           epochs=20,
+          callbacks=[checkpoint_callback],
           validation_data=dataset_val)
 model.load_weights(weights_file)
 weights = model.get_weights()
 
-model_pre = Model(inputs=[inp1, states_in_1], outputs=[out1, states_out_1])
-model_aft = Model(inputs=[inp2, states_in_2], 
-                outputs=[out2, states_out_2])
-                
-model_pre.set_weights(weights[:fir_parameter_nums])
-model_aft.set_weights(weights[fir_parameter_nums:])
 
-# 将前半部分模型转为 .tflite文件
-converter = tf.lite.TFLiteConverter.from_keras_model(model_pre)
-if Quantification:
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
 tflite_model = converter.convert()
-with tf.io.gfile.GFile(file_path + '_pre.tflite', 'wb') as f:
-      f.write(tflite_model)
-      
-# 将后半部分模型转为 .tflite文件
-converter = tf.lite.TFLiteConverter.from_keras_model(model_aft)
-if Quantification:
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
-tflite_model = converter.convert()
-with tf.io.gfile.GFile(file_path + '_2.tflite', 'wb') as f:
+with tf.io.gfile.GFile(file_path + '.tflite', 'wb') as f:
       f.write(tflite_model)
