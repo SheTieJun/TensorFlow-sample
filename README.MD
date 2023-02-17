@@ -91,3 +91,17 @@ Keras 中的 **`activation`** 参数用于选择激活函数，决定每个神�
 - categorical_crossentropy：多分类对数损失
 - sparse_categorical_crossentropy：稀疏多分类对数损失
 - binary_crossentropy：二分类对数损失
+
+### 回调函数
+ModelCheckpoint：定期保存模型，第二个epoch没有第一个好，就不保存第二个epoch，直接在第一个基础上进行第三个epoch。
+EarlyStopping：早停函数，当培训不再改善验证指标时，停止培训。
+ ```
+monitor: 被监测的数据。
+min_delta: 在被监测的数据中被认为是提升的最小变化， 例如，小于 min_delta 的绝对变化会被认为没有提升。
+patience: 没有进步的训练轮数，在这之后训练就会被停止。
+verbose: 详细信息模式。
+mode: {auto, min, max} 其中之一。 在 min 模式中， 当被监测的数据停止下降，训练就会停止；在 max 模式中，当被监测的数据停止上升，训练就会停止；在 auto 模式中，方向会自动从被监测的数据的名字中判断出来。
+ ```
+Tensorboard：后期介绍
+CSVLogger：将结果（损失和指标）写在csv数字上面。
+ 
